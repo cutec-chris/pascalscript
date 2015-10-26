@@ -13,6 +13,19 @@ function ProcessDllImportEx(Caller: TPSExec; P: TPSExternalProcRec; ForceDelayLo
 procedure UnloadDLL(Caller: TPSExec; const sname: tbtstring);
 function UnloadProc(Caller: TPSExec; p: TPSExternalProcRec; Global, Stack: TPSStack): Boolean;
 
+type
+  PLoadedDll = ^TLoadedDll;
+  TLoadedDll = record
+    dllnamehash: Longint;
+    dllname: tbtstring;
+    dllhandle: THandle;
+  end;
+  TMyExec = class(TPSExec);
+  PInteger = ^Integer;
+
+procedure DllFree(Sender: TPSExec; P: PLoadedDll);
+function GetLastErrorProc(Caller: TPSExec; p: TPSExternalProcRec; Global, Stack: TPSStack): Boolean;
+
 implementation
 uses
   {$IFDEF UNIX}
@@ -26,16 +39,6 @@ p^.Ext1 contains the pointer to the Proc function
 p^.ExportDecl:
   'dll:'+DllName+#0+FunctionName+#0+chr(Cc)+Chr(DelayLoad)+Chr(AlternateSearchPath)+VarParams
 }
-
-type
-  PLoadedDll = ^TLoadedDll;
-  TLoadedDll = record
-    dllnamehash: Longint;
-    dllname: tbtstring;
-    dllhandle: THandle;
-  end;
-  TMyExec = class(TPSExec);
-  PInteger = ^Integer;
 
 procedure LAstErrorFree(Sender: TPSExec; P: PInteger);
 begin
