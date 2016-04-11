@@ -2,6 +2,7 @@
 <CONFIG>
   <Package Version="4">
     <Name Value="ppascalscriptlcl"/>
+    <Type Value="RunAndDesignTime"/>
     <AddToProjectUsesSection Value="True"/>
     <Author Value="Carlo Kok"/>
     <CompilerOptions>
@@ -121,10 +122,10 @@ RemObjects Software
         <UnitName Value="uPSR_menus"/>
       </Item17>
     </Files>
-    <Type Value="RunAndDesignTime"/>
     <RequiredPkgs Count="2">
       <Item1>
         <PackageName Value="ppascalscriptfcl"/>
+        <DefaultFilename Value="ppascalscriptfcl.lpk"/>
       </Item1>
       <Item2>
         <PackageName Value="LCL"/>
