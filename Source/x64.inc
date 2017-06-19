@@ -203,7 +203,7 @@ asm
   mov rax, rdx
   jmp @compareitems
 @work:
-{$IFDEF FPC}
+{$IF DEFINED (fpc)}
   push qword ptr [rcx]
 {$ELSE} 
   push [rcx]
