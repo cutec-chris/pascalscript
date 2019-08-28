@@ -9,7 +9,9 @@ Copyright (C) 2000-2009 by Carlo Kok (ck@carlo-kok.com)
 
 interface
 uses
-  SysUtils, uPSUtils{$IFDEF DELPHI6UP}, variants{$ENDIF}{$IFDEF MACOS},uPSCMac{$ELSE}{$IFNDEF PS_NOIDISPATCH}{$IFDEF DELPHI3UP}, ActiveX, Windows{$ELSE}, Ole2{$ENDIF}{$ENDIF}{$ENDIF};
+  {$IFNDEF FPC} {$IFDEF DELPHI2010UP} System.Rtti,{$ENDIF} {$ENDIF}
+  SysUtils, uPSUtils{$IFDEF DELPHI6UP}, variants{$ENDIF}
+  {$IFNDEF PS_NOIDISPATCH}{$IFDEF DELPHI3UP}, ActiveX, Windows{$ELSE}, Ole2{$ENDIF}{$ENDIF};
 
 
 type
@@ -1101,7 +1103,10 @@ function IDispatchInvoke(Self: IDispatch; PropertySet: Boolean; const Name: tbtS
 
 implementation
 uses
-  TypInfo {$IFDEF DELPHI3UP}{$IFNDEF FPC}{$IFNDEF KYLIX} , ComObj {$ENDIF}{$ENDIF}{$ENDIF}{$IFDEF PS_FPC_HAS_COM}, ComObj{$ENDIF};
+  TypInfo {$IFDEF DELPHI3UP}
+  {$IFNDEF FPC}{$IFDEF MSWINDOWS} , ComObj {$ENDIF}{$ENDIF}{$ENDIF}
+  {$IFDEF PS_FPC_HAS_COM}, ComObj{$ENDIF}
+  {$IF NOT DEFINED (NEXTGEN) AND NOT DEFINED (MACOS) AND  DEFINED (DELPHI_TOKYO_UP)}, AnsiStrings{$IFEND};
 
 {$IFDEF DELPHI3UP }
 resourceString
@@ -1539,9 +1544,9 @@ begin
       tkVariant: begin Result := '[Variant]'; exit; end;
 	  {$IFDEF DELPHI6UP}
 	  {$IFNDEF PS_NOWIDESTRING}
-      tkWString: begin Result := ''''+tbtString(GetWideStrProp(Instance, pp))+''; end;
+      tkWString: begin Result := ''''+tbtString(GetWideStrProp(Instance, pp))+''''; exit; end;
 	  {$IFDEF DELPHI2009UP}
-      tkUString: begin Result := ''''+tbtString(GetUnicodeStrProp(Instance, pp))+''; end;
+      tkUString: begin Result := ''''+tbtString({$IFDEF DELPHI_TOKYO_UP}GetStrProp{$ELSE}GetUnicodeStrProp{$ENDIF}(Instance, pp))+''''; exit; end;
 	  {$ENDIF}
       {$ENDIF}
 	  {$ENDIF}
@@ -3529,6 +3534,15 @@ begin
   end;
 end;
 
+function PSGetAnsiChar(Src: Pointer; aType: TPSTypeRec): tbtchar;
+var Res : tbtString;
+begin
+  Res := PSGetAnsiString(Src,aType);
+  if Length(Res) > 0 then
+    Result := Res[{$IFDEF DELPHI2009UP}Low(Res){$ELSE}1{$ENDIF}]
+  else
+    Result := #0;
+end;
 
 function PSGetAnsiString(Src: Pointer; aType: TPSTypeRec): tbtString;
 begin
@@ -4505,7 +4519,7 @@ begin
       btPChar: pansichar(dest^) := pansichar(PSGetAnsiString(Src, srctype));
       btString:
         tbtstring(dest^) := PSGetAnsiString(Src, srctype);
-      btChar: tbtchar(dest^) := tbtchar(PSGetUInt(Src, srctype));
+      btChar: tbtchar(dest^) := PSGetAnsiChar(Src, srctype);
       {$IFNDEF PS_NOWIDESTRING}
       btWideString: tbtwidestring(dest^) := PSGetWideString(Src, srctype);
       btUnicodeString: tbtUnicodeString(dest^) := PSGetUnicodeString(Src, srctype);
@@ -4566,6 +4580,9 @@ begin
         begin
           if srctype.BaseType = btClass then
             TObject(Dest^) := TObject(Src^)
+          else
+          if srctype.BaseType = btVariant then
+            TbtU32(Dest^) := Variant(Src^)
           else
           // nx change start
           if (srctype.BaseType in [btS32, btU32]) then
@@ -6764,7 +6781,9 @@ begin
             begin
               if Param >= Cardinal(PSDynArrayGetLength(Pointer(Dest.P^), dest.aType)) then
               begin
-                CMD_Err(erOutOfRange);
+                CMD_Err2(erCustomError,
+                         tbtstring(Format('Out Of Range! Element index is out of Array range: Element Index is %d, Array length = %d',
+                                [Cardinal(PSDynArrayGetLength(Pointer(Dest.P^), dest.aType)),Param])));
                 Result := False;
                 exit;
               end;
@@ -6775,7 +6794,9 @@ begin
             begin
               if Param >= Cardinal(TPSTypeRec_StaticArray(Dest.aType).Size) then
               begin
-                CMD_Err(erOutOfRange);
+                CMD_Err2(erCustomError,
+                         tbtstring(Format('Out Of Range! Element index is out of Array range: Element Index is %d, Array length = %d',
+                                [Cardinal(TPSTypeRec_StaticArray(Dest.aType).Size),Param])));
                 Result := False;
                 exit;
               end;
@@ -6916,7 +6937,9 @@ begin
             begin
               if Cardinal(Param) >= Cardinal(PSDynArrayGetLength(Pointer(Dest.P^), dest.aType)) then
               begin
-                CMD_Err(erOutOfRange);
+                CMD_Err2(erCustomError,
+                         tbtstring(Format('Out Of Range! Element index is out of Array range: Element Index is %d, Array length = %d',
+                                [Cardinal(PSDynArrayGetLength(Pointer(Dest.P^), dest.aType)),Param])));
                 Result := False;
                 exit;
               end;
@@ -6927,7 +6950,9 @@ begin
             begin
               if Param >= Cardinal(TPSTypeRec_StaticArray(Dest.aType).Size) then
               begin
-                CMD_Err(erOutOfRange);
+                CMD_Err2(erCustomError,
+                         tbtstring(Format('Out Of Range! Element index is out of Array range: Element Index is %d, Array length = %d',
+                                [Cardinal(TPSTypeRec_StaticArray(Dest.aType).Size),Param])));
                 Result := False;
                 exit;
               end;
@@ -9320,7 +9345,7 @@ begin
 end;
 
 
-{$IFNDEF DELPHI6UP}
+{$IFDEF DELPHI6UP}
 function _VarArrayGet(var S : Variant; I : Integer) : Variant;
 begin
   result := VarArrayGet(S, [I]);
@@ -9420,7 +9445,7 @@ begin
   RegisterFunctionName('WStrSet', DefProc, Pointer(44), nil);
 
   {$ENDIF}
-  {$IFNDEF DELPHI6UP}
+  {$IFDEF DELPHI6UP}
   RegisterDelphiFunction(@_VarArrayGet, 'VarArrayGet', cdRegister);
   RegisterDelphiFunction(@_VarArraySet, 'VarArraySet', cdRegister);
   {$ENDIF}
@@ -9430,7 +9455,8 @@ end;
 
 function ToString(p: PansiChar): tbtString;
 begin
-  SetString(Result, p, StrLen(p));
+  SetString(Result, p,
+  {$IF NOT DEFINED (NEXTGEN) AND NOT DEFINED (MACOS) AND DEFINED (DELPHI_TOKYO_UP)}AnsiStrings.StrLen(p){$ELSE}Length(p){$IFEND});
 end;
 
 function IntPIFVariantToVariant(Src: pointer; aType: TPSTypeRec; var Dest: Variant): Boolean;
@@ -9814,16 +9840,24 @@ end;
 
 
 {$ifndef FPC}
-{$IFDEF Delphi6UP}
-  {$IFDEF CPUX64}
-    {$include x64.inc}
+  {$IFDEF DELPHI2010UP}
+    {$IFDEF AUTOREFCOUNT}
+      {$fatal Pascal Script does not supports compilation with AUTOREFCOUNT at the moment!}
+    {$ELSE}
+      {$include InvokeCall.inc}
+    {$ENDIF}
   {$ELSE}
-  {$include x86.inc}
+    {$IFDEF Delphi6UP}
+      {$IFDEF CPUX64}
+        {$include x64.inc}
+      {$ELSE}
+        {$include x86.inc}
+      {$ENDIF}
+    {$ELSE}
+      {$include x86.inc}
+    {$ENDIF}
   {$ENDIF}
-{$ELSE}
-  {$include x86.inc}
-{$ENDIF}
-{$else}
+{$else}   //fpc includes left unchanged.
 {$IFDEF Delphi6UP}
   {$if defined(cpu86)}
     {$include x86.inc}
@@ -9837,7 +9871,7 @@ end;
     {$fatal Pascal Script is not supported for your architecture at the moment!}
   {$ifend}
 {$ELSE}
-{$include x86.inc}
+  {$include x86.inc}
 {$ENDIF}
 {$endif}
 
@@ -10290,7 +10324,7 @@ begin
     v := NewPPSVariantIFC(Stack[CurrStack + 1], True);
   end else v := nil;
   try
-    Result := Caller.InnerfuseCall(FSelf, p.Ext1, {$IFDEF FPC}TPSCallingConvention(Integer(cc) or 64){$ELSE}cc{$ENDIF}, MyList, v);
+    Result := Caller.InnerfuseCall(FSelf, p.Ext1, TPSCallingConvention(Integer(cc) or 64), MyList, v);
   finally
     DisposePPSVariantIFC(v);
     DisposePPSVariantIFCList(mylist);
@@ -10375,7 +10409,7 @@ begin
     v := NewPPSVariantIFC(Stack[CurrStack + 1], True);
   end else v := nil;
   try
-    Result := Caller.InnerfuseCall(FSelf, VirtualClassMethodPtrToPtr(p.Ext1, FSelf), {$IFDEF FPC}TPSCallingConvention(Integer(cc) or 128){$ELSE}cc{$ENDIF}, MyList, v);
+    Result := Caller.InnerfuseCall(FSelf, VirtualClassMethodPtrToPtr(p.Ext1, FSelf), TPSCallingConvention(Integer(cc) or 128), MyList, v);
   finally
     DisposePPSVariantIFC(v);
     DisposePPSVariantIFCList(mylist);
@@ -10640,7 +10674,7 @@ begin
 {$IFNDEF DELPHI2009UP}btUnicodeString,{$ENDIF}
   btWideString: SetWideStrProp(TObject(FSelf), P.Ext1, tbtWidestring(n.dta^));
 {$IFDEF DELPHI2009UP}
-  btUnicodeString: SetUnicodeStrProp(TObject(FSelf), P.Ext1, tbtUnicodestring(n.dta^));
+  btUnicodeString: {$IFDEF DELPHI_TOKYO_UP}SetStrProp{$ELSE}SetUnicodeStrProp{$ENDIF}(TObject(FSelf), P.Ext1, tbtUnicodestring(n.dta^));
 {$ENDIF}
   {$ENDIF}
 {$ENDIF}
@@ -10697,7 +10731,7 @@ begin
 	  {$IFDEF DELPHI6UP}
 {$IFNDEF PS_NOWIDESTRING}
         {$IFDEF DELPHI2009UP}
-        btUnicodeString: tbtUnicodeString(n.dta^) := GetUnicodeStrProp(TObject(FSelf), P.Ext1);
+        btUnicodeString: tbtUnicodeString(n.dta^) := {$IFDEF DELPHI_TOKYO_UP}GetStrProp{$ELSE}GetUnicodeStrProp{$ENDIF}(TObject(FSelf), P.Ext1);
         {$ELSE}
         btUnicodeString,
         {$ENDIF}
