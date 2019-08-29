@@ -34,6 +34,10 @@ uses
   {$ELSE}
   {$IFDEF KYLIX}SysUtils;{$ELSE}Windows;{$ENDIF}
   {$ENDIF}
+  {$IFDEF UNIX}
+  const
+    ERROR_MOD_NOT_FOUND = -5;
+  {$ENDIF}
 
 {
 p^.Ext1 contains the pointer to the Proc function
@@ -137,7 +141,9 @@ begin
       if dllhandle = 0 then
       begin
         p.Ext2 := Pointer(1);
+        {$IFNDEF UNIX_OR_KYLIX}
         ErrorCode := GetLastError;
+        {$ENDIF}
         Result := False;
         exit;
       end;
@@ -156,7 +162,9 @@ begin
   if p.Ext1 = nil then
   begin
     p.Ext2 := Pointer(1);
+    {$IFNDEF UNIX_OR_KYLIX}
     ErrorCode := GetLastError;
+    {$ENDIF}
     Result := false;
     exit;
   end;
